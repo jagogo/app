@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滑卡選擇遊戲</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 防止手機上滑動時觸發瀏覽器的上一頁/下一頁 */
+        body {
+            overscroll-behavior: none;
+            touch-action: pan-y;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 從全域 React 物件中取出我們需要的 Hooks
+        const { useState, useEffect, useRef } = React;
+
+        // --- 內建圖示元件 (取代 lucide-react) ---
+        const ChevronLeft = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6" /></svg>
+        );
+        const ChevronRight = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>
+        );
+        const RotateCcw = ({ size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" /><path d="M3 3v9h9" /></svg>
+        );
+
+        // --- 主應用程式 ---
+        const App = () => {
+            const [page, setPage] = useState(() => {
+                const hash = window.location.hash;
+                return (hash === '#/admin' || hash === '#admin') ? 'admin' : 'home';
+            });
+            const [currentQuestion, setCurrentQuestion] = useState(1);
+            const [userChoices, setUserChoices] = useState({});
+            // 注意：在單一頁面重新整理後，此 state 會重置。若需持久化需使用 localStorage
+            const [stats, setStats] = useState({});
+            const [timer, setTimer] = useState(6);
+
+            // 使用圖片連結（測試用）
+            const images = [
+                'img/01.png',
+                'img/02.png',
+                'img/03.png',
+                'img/04.png',
+                'img/05.png',
+                'img/06.png',
+                'img/07.png',
+                'img/08.png',
+                'img/09.png',
+                'img/10.png',
+            ];
+
+            // 監聽 URL hash 變化
+            useEffect(() => {
+                const handleHashChange = () => {
+                    const hash = window.location.hash;
+                    if (hash === '#/admin' || hash === '#admin') {
+                        setPage('admin');
+                    } else if (hash === '' || hash === '#' || hash === '#/') {
+                        setPage('home');
+                        setUserChoices({});
+                        setCurrentQuestion(1);
+                    }
+                };
+
+                window.addEventListener('hashchange', handleHashChange);
+                return () => window.removeEventListener('hashchange', handleHashChange);
+            }, []);
+
+            // 倒數計時
+            useEffect(() => {
+                if (page.startsWith('question') && timer > 0) {
+                    const countdown = setTimeout(() => setTimer(timer - 1), 1000);
+                    return () => clearTimeout(countdown);
+                } else if (page.startsWith('question') && timer === 0) {
+                    handleSkip();
+                }
+            }, [timer, page]);
+
+            const handleChoice = (choice) => {
+                const newChoices = { ...userChoices, [currentQuestion]: choice };
+                setUserChoices(newChoices);
+
+                const newStats = { ...stats };
+                if (!newStats[currentQuestion]) {
+                    newStats[currentQuestion] = { like: 0, dislike: 0, skip: 0 };
+                }
+                newStats[currentQuestion][choice]++;
+                setStats(newStats);
+
+                nextQuestion();
+            };
+
+            const handleSkip = () => {
+                const newChoices = { ...userChoices, [currentQuestion]: 'skip' };
+                setUserChoices(newChoices);
+
+                const newStats = { ...stats };
+                if (!newStats[currentQuestion]) {
+                    newStats[currentQuestion] = { like: 0, dislike: 0, skip: 0 };
+                }
+                newStats[currentQuestion].skip++;
+                setStats(newStats);
+
+                nextQuestion();
+            };
+
+            const nextQuestion = () => {
+                if (currentQuestion < 10) {
+                    setCurrentQuestion(currentQuestion + 1);
+                    setTimer(6);
+                    setPage('question');
+                } else {
+                    setPage('result');
+                }
+            };
+
+            const handleResetStats = () => {
+                if (window.confirm('確定要重置所有統計數據嗎？此操作無法復原。')) {
+                    setStats({});
+                    alert('統計數據已重置');
+                }
+            };
+
+            // 首頁
+            if (page === 'home') {
+                return (
+                    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
+                        <div className="max-w-md w-full text-center space-y-8">
+                            <h1 className="text-4xl font-bold text-orange-600">你想看哪個作品集？</h1>
+                            <p className="text-lg text-gray-100">
+                                左右滑動卡片來表達你的喜好<br />
+                                👈 向右滑：想看<br />
+                                👉 向左滑：不想看<br />
+                                每題限時 6 秒，共十張
+                            </p>
+                            <button
+                                onClick={() => {
+                                    setPage('question');
+                                    setCurrentQuestion(1);
+                                    setTimer(6);
+                                }}
+                                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-full text-xl transition-all transform hover:scale-105"
+                            >
+                                開始
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 題目頁
+            if (page === 'question') {
+                return (
+                    <QuestionPage
+                        questionNum={currentQuestion}
+                        image={images[currentQuestion - 1]}
+                        timer={timer}
+                        onChoice={handleChoice}
+                    />
+                );
+            }
+
+            // 個人結果頁
+            if (page === 'result') {
+                const liked = Object.entries(userChoices)
+                    .filter(([_, choice]) => choice === 'like')
+                    .map(([q]) => parseInt(q));
+                const disliked = Object.entries(userChoices)
+                    .filter(([_, choice]) => choice === 'dislike')
+                    .map(([q]) => parseInt(q));
+                const skipped = Object.entries(userChoices)
+                    .filter(([_, choice]) => choice === 'skip')
+                    .map(([q]) => parseInt(q));
+
+                return (
+                    <div className="min-h-screen bg-gray-900 text-white p-4 pb-24">
+                        <div className="max-w-2xl mx-auto space-y-8">
+                            <h1 className="text-3xl font-bold text-orange-600 text-center">你的選擇結果</h1>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-100 mb-4">想看的作品集</h2>
+                                    {liked.length === 0 ? (
+                                        <p className="text-gray-500 text-center">沒有選擇想看的作品</p>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {liked.map(q => (
+                                                <div key={q} className="bg-white rounded-lg p-3 shadow-md">
+                                                    <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-full h-32 object-cover rounded mb-2" />
+                                                    <p className="text-center text-sm text-gray-100">{String(q).padStart(2, '0')}/10</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-100 mb-4">不想看的作品集</h2>
+                                    {disliked.length === 0 ? (
+                                        <p className="text-gray-500 text-center">沒有選擇不想看的作品</p>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {disliked.map(q => (
+                                                <div key={q} className="bg-white rounded-lg p-3 shadow-md">
+                                                    <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-full h-32 object-cover rounded mb-2" />
+                                                    <p className="text-center text-sm text-gray-100">{String(q).padStart(2, '0')}/10</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {skipped.length > 0 && (
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-100 mb-4">跳過的作品</h2>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {skipped.map(q => (
+                                                <div key={q} className="bg-white rounded-lg p-3 shadow-md opacity-60">
+                                                    <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-full h-32 object-cover rounded mb-2" />
+                                                    <p className="text-center text-sm text-gray-100">{String(q).padStart(2, '0')}/10</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => setPage('stats')}
+                                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-lg transition-all"
+                            >
+                                看大家怎麼選擇
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 全體統計頁
+            if (page === 'stats') {
+                const getTopCards = (type, count = 3) => {
+                    return Object.entries(stats)
+                        .map(([q, s]) => ({ q: parseInt(q), count: s[type] || 0 }))
+                        .sort((a, b) => b.count - a.count || a.q - b.q)
+                        .slice(0, count);
+                };
+
+                const topLiked = getTopCards('like');
+                const topDisliked = getTopCards('dislike');
+
+                return (
+                    <div className="min-h-screen bg-gray-900 text-white p-4">
+                        <div className="max-w-2xl mx-auto space-y-8">
+                            <h1 className="text-3xl font-bold text-orange-600 text-center">大家的選擇</h1>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-100 mb-4">大家想看的作品集</h2>
+                                    {topLiked.length === 0 ? (
+                                        <p className="text-gray-500 text-center">還沒有統計數據</p>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {topLiked.map(({ q, count }) => (
+                                                <div key={q} className="bg-white rounded-lg p-3 shadow-md">
+                                                    <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-full h-32 object-cover rounded mb-2" />
+                                                    <p className="text-center text-sm text-gray-100">{String(q).padStart(2, '0')}/10</p>
+                                                    <p className="text-center text-xs text-orange-600 font-bold">{count} 票</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-100 mb-4">大家不想看的作品集</h2>
+                                    {topDisliked.length === 0 ? (
+                                        <p className="text-gray-500 text-center">還沒有統計數據</p>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {topDisliked.map(({ q, count }) => (
+                                                <div key={q} className="bg-white rounded-lg p-3 shadow-md">
+                                                    <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-full h-32 object-cover rounded mb-2" />
+                                                    <p className="text-center text-sm text-gray-100">{String(q).padStart(2, '0')}/10</p>
+                                                    <p className="text-center text-xs text-orange-600 font-bold">{count} 票</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setPage('home');
+                                    setUserChoices({});
+                                    setCurrentQuestion(1);
+                                }}
+                                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 rounded-lg transition-all"
+                            >
+                                返回首頁
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 管理者頁面
+            if (page === 'admin') {
+                const getSortedCards = (type) => {
+                    return Object.entries(stats)
+                        .map(([q, s]) => ({ q: parseInt(q), count: s[type] || 0 }))
+                        .sort((a, b) => b.count - a.count || a.q - b.q);
+                };
+
+                return (
+                    <div className="min-h-screen bg-gray-900 text-white p-4">
+                        <div className="max-w-4xl mx-auto space-y-8">
+                            <h1 className="text-3xl font-bold text-orange-600 text-center">管理者控制台</h1>
+
+                            <div className="bg-white rounded-lg p-6 shadow-lg space-y-6">
+                                <h2 className="text-xl font-bold text-gray-100">統計數據</h2>
+
+                                <div>
+                                    <h3 className="text-lg font-bold text-green-600 mb-3">想看排行</h3>
+                                    <div className="space-y-2">
+                                        {getSortedCards('like').map(({ q, count }) => (
+                                            <div key={q} className="flex items-center gap-3 p-3 bg-green-50 rounded">
+                                                <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-16 h-16 object-cover rounded" />
+                                                <div className="flex-1">
+                                                    <p className="font-bold">{String(q).padStart(2, '0')}/10</p>
+                                                    <p className="text-sm text-gray-100">
+                                                        想看: {stats[q]?.like || 0} | 不想看: {stats[q]?.dislike || 0} | 跳過: {stats[q]?.skip || 0}
+                                                    </p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-green-600">{count}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-lg font-bold text-red-600 mb-3">不想看排行</h3>
+                                    <div className="space-y-2">
+                                        {getSortedCards('dislike').map(({ q, count }) => (
+                                            <div key={q} className="flex items-center gap-3 p-3 bg-red-50 rounded">
+                                                <img src={images[q - 1]} alt={`卡片 ${q}`} className="w-16 h-16 object-cover rounded" />
+                                                <div className="flex-1">
+                                                    <p className="font-bold">{String(q).padStart(2, '0')}/10</p>
+                                                    <p className="text-sm text-gray-100">
+                                                        想看: {stats[q]?.like || 0} | 不想看: {stats[q]?.dislike || 0} | 跳過: {stats[q]?.skip || 0}
+                                                    </p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-red-600">{count}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleResetStats}
+                                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all"
+                                >
+                                    <RotateCcw size={20} />
+                                    重置統計數據
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setPage('home');
+                                    setUserChoices({});
+                                    setCurrentQuestion(1);
+                                    window.location.hash = '';
+                                }}
+                                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 rounded-lg transition-all"
+                            >
+                                返回首頁
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return null;
+        };
+
+        // 題目卡片組件
+        const QuestionPage = ({ questionNum, image, timer, onChoice }) => {
+            const [dragOffset, setDragOffset] = useState(0);
+            const [isDragging, setIsDragging] = useState(false);
+            const cardRef = useRef(null);
+            const startXRef = useRef(0);
+
+            const handleStart = (clientX) => {
+                setIsDragging(true);
+                startXRef.current = clientX;
+            };
+
+            const handleMove = (clientX) => {
+                if (!isDragging) return;
+                const offset = clientX - startXRef.current;
+                setDragOffset(offset);
+            };
+
+            const handleEnd = () => {
+                if (!isDragging) return;
+                setIsDragging(false);
+
+                const cardWidth = cardRef.current?.offsetWidth || 300;
+                const threshold = cardWidth * 0.3;
+
+                if (Math.abs(dragOffset) > threshold) {
+                    onChoice(dragOffset > 0 ? 'like' : 'dislike');
+                }
+
+                setDragOffset(0);
+            };
+
+            const rotation = dragOffset / 10;
+            const opacity = 1 - Math.abs(dragOffset) / 400;
+
+            return (
+                <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-md space-y-8">
+                        <div className="text-center">
+                            <div className="text-6xl font-bold text-orange-600 mb-2">{timer}</div>
+                            <div className="text-sm text-gray-100">秒</div>
+                        </div>
+
+                        <div className="relative h-[452px] flex items-center justify-center">
+                            <div
+                                ref={cardRef}
+                                className="absolute w-80 h-[452px] bg-white rounded-2xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden flex items-center justify-center"
+                                style={{
+                                    transform: `translateX(${dragOffset}px) rotate(${rotation}deg)`,
+                                    opacity: opacity,
+                                    transition: isDragging ? 'none' : 'transform 0.3s, opacity 0.3s',
+                                }}
+                                onMouseDown={(e) => handleStart(e.clientX)}
+                                onMouseMove={(e) => handleMove(e.clientX)}
+                                onMouseUp={handleEnd}
+                                onMouseLeave={handleEnd}
+                                onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+                                onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+                                onTouchEnd={handleEnd}
+                            >
+                                <img
+                                    src={image}
+                                    alt={`卡片 ${questionNum}`}
+                                    className="w-full h-full object-contain"
+                                    crossOrigin="anonymous"
+                                />
+                            </div>
+
+                            {dragOffset < -50 && (
+                                <div className="absolute left-8 top-1/2 -translate-y-1/2 text-6xl opacity-50">❌</div>
+                            )}
+                            {dragOffset > 50 && (
+                                <div className="absolute right-8 top-1/2 -translate-y-1/2 text-6xl opacity-50">✅</div>
+                            )}
+                        </div>
+
+                        <div className="text-center text-gray-100 font-bold">
+                            {String(questionNum).padStart(2, '0')}/10
+                        </div>
+
+                        <div className="flex justify-between items-center px-8">
+                            <div className="flex flex-col items-center space-y-2">
+                                <ChevronLeft size={40} className="text-red-500" />
+                                <span className="text-sm font-bold text-gray-100">不想看</span>
+                            </div>
+                            <div className="flex flex-col items-center space-y-2">
+                                <ChevronRight size={40} className="text-green-500" />
+                                <span className="text-sm font-bold text-gray-100">想看</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
