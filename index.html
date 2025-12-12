@@ -480,19 +480,32 @@
                             )}
                         </div>
 
-                        <div className="text-center text-gray-100 font-bold">
-                            {String(questionNum).padStart(2, '0')}/10
-                        </div>
+                        {/* --- 合併後的新代碼 (貼上這個) --- */}
+                        <div className="flex items-center justify-between px-8 w-full mt-4">
 
-                        <div className="flex justify-between items-center px-8">
-                            <div className="flex flex-col items-center space-y-2">
+                            {/* 左側：不想看 */}
+                            <div
+                                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
+                                onClick={() => onChoice('dislike')} // 點擊也能觸發
+                            >
                                 <ChevronLeft size={40} className="text-red-500" />
-                                <span className="text-sm font-bold text-gray-100">不想看</span>
+                                <span className="text-xs font-bold text-gray-500">不想看</span>
                             </div>
-                            <div className="flex flex-col items-center space-y-2">
+
+                            {/* 中間：頁碼 */}
+                            <div className="text-2xl font-bold text-gray-400">
+                                {String(questionNum).padStart(2, '0')}/10
+                            </div>
+
+                            {/* 右側：想看 */}
+                            <div
+                                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
+                                onClick={() => onChoice('like')} // 點擊也能觸發
+                            >
                                 <ChevronRight size={40} className="text-green-500" />
-                                <span className="text-sm font-bold text-gray-100">想看</span>
+                                <span className="text-xs font-bold text-gray-500">想看</span>
                             </div>
+
                         </div>
                     </div>
                 </div>
